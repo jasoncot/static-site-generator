@@ -1,11 +1,16 @@
 from extractmarkdownimages import extract_markdown_images
 from extractmarkdownlinks import extract_markdown_links
 from textnode import TextNode, TextType
+from splitnodesdelimiter import split_nodes_delimiter
 
 def split_nodes_image(old_nodes):
     new_nodes = []
 
     for node in old_nodes:
+        if node.text_type != TextType.TEXT:
+            new_nodes.append(node)
+            continue
+
         image_pairs = extract_markdown_images(node.text)
         remainder = node.text
 
@@ -26,6 +31,10 @@ def split_nodes_link(old_nodes):
     new_nodes = []
 
     for node in old_nodes:
+        if node.text_type != TextType.TEXT:
+            new_nodes.append(node)
+            continue
+
         image_pairs = extract_markdown_links(node.text)
         remainder = node.text
 
@@ -42,3 +51,28 @@ def split_nodes_link(old_nodes):
 
     return new_nodes
 
+def tap(func):
+    def inner(value):
+        func(value)
+        return value
+    return inner
+
+def pipe(*args):
+    def inner(value):
+        holder = value
+        for fn in args:
+            holder = fn(holder)
+
+        return holder
+    
+    return inner
+
+
+def text_to_textnodes(text):
+    return pipe(
+        lambda n: split_nodes_delimiter(n, "**", TextType.BOLD),
+        lambda n: split_nodes_delimiter(n, "*", TextType.ITALIC),
+        lambda n: split_nodes_delimiter(n, "`", TextType.CODE),
+        split_nodes_image,
+        split_nodes_link
+    )([TextNode(text, TextType.TEXT)])
