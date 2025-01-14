@@ -76,3 +76,12 @@ def text_to_textnodes(text):
         split_nodes_image,
         split_nodes_link
     )([TextNode(text, TextType.TEXT)])
+
+def markdown_to_blocks(markdown):
+    return list(filter(
+        lambda s: len(s) > 0, 
+        list(map(
+            lambda b: b.strip(),
+            markdown.split("\n\n")
+        ))
+    ))

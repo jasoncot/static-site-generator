@@ -1,5 +1,5 @@
 import unittest
-from utils import split_nodes_image, split_nodes_link, text_to_textnodes
+from utils import split_nodes_image, split_nodes_link, text_to_textnodes, markdown_to_blocks
 from textnode import TextType, TextNode
 
 class TestUtils(unittest.TestCase):
@@ -57,3 +57,17 @@ class TestUtils(unittest.TestCase):
                 TextNode("link", TextType.LINK, "https://boot.dev"),
             ]
         )
+    
+    def test_markdown_to_blocks(self):
+        blocks = markdown_to_blocks("""# This is a heading
+
+This is a paragraph of text. It has some **bold** and *italic* words inside of it.
+
+* This is the first list item in a list block
+* This is a list item
+* This is another list item""")
+        self.assertEqual(blocks[0], "# This is a heading")
+        self.assertEqual(blocks[1], "This is a paragraph of text. It has some **bold** and *italic* words inside of it.")
+        self.assertEqual(blocks[2], """* This is the first list item in a list block
+* This is a list item
+* This is another list item""")
