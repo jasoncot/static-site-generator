@@ -1,5 +1,5 @@
 import unittest
-from utils import split_nodes_image, split_nodes_link, text_to_textnodes, markdown_to_blocks
+from utils import split_nodes_image, split_nodes_link, text_to_textnodes, markdown_to_blocks, block_to_block_type, markdown_to_html
 from textnode import TextType, TextNode
 
 class TestUtils(unittest.TestCase):
@@ -71,3 +71,35 @@ This is a paragraph of text. It has some **bold** and *italic* words inside of i
         self.assertEqual(blocks[2], """* This is the first list item in a list block
 * This is a list item
 * This is another list item""")
+        
+    def test_block_to_block_type(self):
+        self.assertEqual(
+            block_to_block_type("# This is a heading"),
+            "heading"
+        )
+
+        self.assertEqual(
+            block_to_block_type("This is a paragraph of text. It has some **bold** and *italic* words inside of it."),
+            "paragraph"
+        )
+
+        self.assertEqual(
+            block_to_block_type("""* This is the first list item in a list block
+* This is a list item
+* This is another list item"""),
+            "unordered_list"
+        )
+
+    def test_markdown_to_html(self):
+        html_node = markdown_to_html("""# This is a heading
+
+This is a paragraph of text. It has some **bold** and *italic* words inside of it.
+
+* This is the first list item in a list block
+* This is a list item
+* This is another list item""")
+        
+        self.assertEqual(html_node.tag, 'div')
+        self.assertEqual(html_node.children[0].tag, 'h1')
+        self.assertEqual(html_node.children[1].tag, 'p')
+        self.assertEqual(html_node.children[2].tag, 'ul')

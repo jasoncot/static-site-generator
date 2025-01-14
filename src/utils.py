@@ -2,6 +2,8 @@ from extractmarkdownimages import extract_markdown_images
 from extractmarkdownlinks import extract_markdown_links
 from textnode import TextNode, TextType
 from splitnodesdelimiter import split_nodes_delimiter
+from parentnode import ParentNode
+import re
 
 def split_nodes_image(old_nodes):
     new_nodes = []
@@ -85,3 +87,91 @@ def markdown_to_blocks(markdown):
             markdown.split("\n\n")
         ))
     ))
+
+def block_to_block_type(block):
+    matches = re.findall(r"^(#{1,6})", block)
+    if len(matches) > 0:
+        return "heading"
+    
+    lines = block.split("\n")
+
+    if block.startswith("```") and block.endswith("```"):
+        return "code"
+    
+    if all(map(lambda s: s.startswith(">"), lines)):
+        return "quote"
+    
+    if all(map(lambda s: s.startswith("* ") or s.startswith("- "), lines)):
+        return "unordered_list"
+    
+    if all(map(lambda s: re.search("^\d+\.", s) != None, lines)):
+        return "ordered_list"
+    
+    return "paragraph"
+
+def parent_block_factory(block_text, block_type):
+    if block_type == "heading":
+        hash_counts = block_text.count("#", 0, 7)
+        return ParentNode(
+            f"h{hash_counts}",
+            text_to_textnodes(block_text.lstrip("# "))
+        )
+    
+    if block_type == "code":
+        modified_text = re.sub(r"^`{3}|`{3}$", "", block_text)
+        return ParentNode(
+            "code",
+            text_to_textnodes(modified_text)
+        )
+    
+    if block_type == "quote":
+        modified_text = re.sub(r"\n> ", "\n", block_text)
+        return ParentNode(
+            "blockquote",
+            text_to_textnodes(modified_text)
+        )
+    
+    if block_type == "unordered_list":
+        list_items = pipe(
+            lambda full_text: re.sub(r"\n[-*] ", "\n", full_text).split("\n"),
+            lambda lines: list(map(
+                pipe(
+                    lambda text: text_to_textnodes(text),
+                    lambda child_nodes: ParentNode('li', child_nodes)
+                ),
+                lines
+            ))
+        )(block_text)
+        return ParentNode('ul', list_items)
+    
+    if block_type == "ordered_list":
+        list_items = pipe(
+            lambda full_text: re.sub(r"\n\d+\. ", "\n", full_text).split("\n"),
+            lambda lines: list(map(
+                pipe(
+                    lambda text: text_to_textnodes(text),
+                    lambda child_nodes: ParentNode('li', child_nodes)
+                ),
+                lines
+            ))
+        )(block_text)
+        return ParentNode('ol', list_items)
+
+    if block_type == "paragraph":
+        return ParentNode('p', text_to_textnodes(block_text))
+
+    raise Exception("unsupported block type")
+
+
+def blocks_to_document(block_and_parent_types):
+    return ParentNode(
+        'div',
+        list(map(lambda pair: parent_block_factory(*pair), block_and_parent_types))
+    )
+
+def markdown_to_html(markdown):
+    return pipe(
+        lambda md: markdown_to_blocks(md),
+        lambda md_blocks: list(map(lambda bl: [bl, block_to_block_type(bl)], md_blocks)),
+        blocks_to_document
+    )(markdown)
