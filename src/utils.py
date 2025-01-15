@@ -151,7 +151,7 @@ def parent_block_factory(block_text, block_type):
         )
     
     if block_type == "quote":
-        modified_text = re.sub(r"\n> ", "\n", block_text)
+        modified_text = re.sub(r"^> ", "", block_text, 0, re.M)
         return ParentNode(
             "blockquote",
             list(map(text_node_to_html_node, text_to_textnodes(modified_text)))
