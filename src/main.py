@@ -2,6 +2,7 @@ import functools
 import os
 import shutil
 from textnode import TextNode, TextType
+from utils import generate_page
 
 def set_source_dir_for_accumulator(dir):
 	def files_and_dirs_accumulator(files_and_dirs, item):
@@ -43,5 +44,6 @@ def copy_dir_files_to_dest(src_path, dest_path):
 
 def main():
 	copy_dir_files_to_dest('./static', './public')
+	generate_page("./content/index.md", "./src/template.html", "./public/index.html")
 
 main()

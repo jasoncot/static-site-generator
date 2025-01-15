@@ -1,5 +1,5 @@
 import unittest
-from utils import split_nodes_image, split_nodes_link, text_to_textnodes, markdown_to_blocks, block_to_block_type, markdown_to_html
+from utils import split_nodes_image, split_nodes_link, text_to_textnodes, markdown_to_blocks, block_to_block_type, markdown_to_html, extract_title
 from textnode import TextType, TextNode
 
 class TestUtils(unittest.TestCase):
@@ -103,3 +103,7 @@ This is a paragraph of text. It has some **bold** and *italic* words inside of i
         self.assertEqual(html_node.children[0].tag, 'h1')
         self.assertEqual(html_node.children[1].tag, 'p')
         self.assertEqual(html_node.children[2].tag, 'ul')
+
+    def test_extract_title(self):
+        markdown = "# Hello"
+        self.assertEqual(extract_title("# Hello"), "Hello")

@@ -3,7 +3,9 @@ from extractmarkdownlinks import extract_markdown_links
 from textnode import TextNode, TextType
 from splitnodesdelimiter import split_nodes_delimiter
 from parentnode import ParentNode
+from leafnode import LeafNode
 import re
+import os
 
 def split_nodes_image(old_nodes):
     new_nodes = []
@@ -88,6 +90,30 @@ def markdown_to_blocks(markdown):
         ))
     ))
 
+def text_node_to_html_node(text_node):
+    if text_node.text_type == TextType.TEXT:
+        return LeafNode(None, text_node.text)
+    
+    if text_node.text_type == TextType.NORMAL:
+        return LeafNode(None, text_node.text)
+    
+    if text_node.text_type == TextType.BOLD:
+        return LeafNode("b", text_node.text)
+    
+    if text_node.text_type == TextType.ITALIC:
+        return LeafNode("i", text_node.text)
+    
+    if text_node.text_type == TextType.CODE:
+        return LeafNode("code", text_node.text)
+    
+    if text_node.text_type == TextType.LINK:
+        return LeafNode("a", text_node.text, {"href": text_node.url})
+
+    if text_node.text_type == TextType.IMAGE:
+        return LeafNode("img", text_node.text, {"src": text_node.url})
+    
+    raise Exception("unknown text_node type")
+
 def block_to_block_type(block):
     matches = re.findall(r"^(#{1,6})", block)
     if len(matches) > 0:
@@ -114,30 +140,30 @@ def parent_block_factory(block_text, block_type):
         hash_counts = block_text.count("#", 0, 7)
         return ParentNode(
             f"h{hash_counts}",
-            text_to_textnodes(block_text.lstrip("# "))
+            list(map(text_node_to_html_node, text_to_textnodes(block_text.lstrip("# "))))
         )
     
     if block_type == "code":
         modified_text = re.sub(r"^`{3}|`{3}$", "", block_text)
         return ParentNode(
             "code",
-            text_to_textnodes(modified_text)
+            list(map(text_node_to_html_node, text_to_textnodes(modified_text)))
         )
     
     if block_type == "quote":
         modified_text = re.sub(r"\n> ", "\n", block_text)
         return ParentNode(
             "blockquote",
-            text_to_textnodes(modified_text)
+            list(map(text_node_to_html_node, text_to_textnodes(modified_text)))
         )
     
     if block_type == "unordered_list":
         list_items = pipe(
-            lambda full_text: re.sub(r"\n[-*] ", "\n", full_text).split("\n"),
+            lambda full_text: re.sub(r"^[-*] ", "", full_text, 0, re.M).split("\n"),
             lambda lines: list(map(
                 pipe(
                     lambda text: text_to_textnodes(text),
-                    lambda child_nodes: ParentNode('li', child_nodes)
+                    lambda child_nodes: ParentNode('li', list(map(text_node_to_html_node, child_nodes)))
                 ),
                 lines
             ))
@@ -146,11 +172,11 @@ def parent_block_factory(block_text, block_type):
     
     if block_type == "ordered_list":
         list_items = pipe(
-            lambda full_text: re.sub(r"\n\d+\. ", "\n", full_text).split("\n"),
+            lambda full_text: re.sub(r"^\d+\. ", "", full_text, 0, re.M).split("\n"),
             lambda lines: list(map(
                 pipe(
                     lambda text: text_to_textnodes(text),
-                    lambda child_nodes: ParentNode('li', child_nodes)
+                    lambda child_nodes: ParentNode('li', list(map(text_node_to_html_node, child_nodes)))
                 ),
                 lines
             ))
@@ -158,7 +184,7 @@ def parent_block_factory(block_text, block_type):
         return ParentNode('ol', list_items)
 
     if block_type == "paragraph":
-        return ParentNode('p', text_to_textnodes(block_text))
+        return ParentNode('p', list(map(text_node_to_html_node, text_to_textnodes(block_text))))
 
     raise Exception("unsupported block type")
 
@@ -172,6 +198,44 @@ def blocks_to_document(block_and_parent_types):
 def markdown_to_html(markdown):
     return pipe(
         lambda md: markdown_to_blocks(md),
-        lambda md_blocks: list(map(lambda bl: [bl, block_to_block_type(bl)], md_blocks)),
+        lambda md_blocks: list(map(
+            lambda bl: [bl, block_to_block_type(bl)],
+            md_blocks
+        )),
         blocks_to_document
     )(markdown)
+
+def extract_title(markdown):
+    match = re.search(r"(?:^#|\n#) ([^\n]+)", markdown)
+    if match == None:
+        raise Exception("no h1 header found in markdown")
+    
+    return match[1].strip(" ")
+
+def generate_page(from_path, template_path, dest_path):
+    print(f"Generating page from {from_path} to {dest_path} using {template_path}")
+    if os.path.isfile(from_path) != True:
+        raise Exception(f"{from_path} is not a file")
+    
+    file_obj = open(from_path)
+    markdown = file_obj.read()
+    file_obj.close()
+
+    if os.path.isfile(template_path) != True:
+        raise Exception(f"{template_path} is not a file")
+    
+    file_obj = open(template_path)
+    template = file_obj.read()
+    file_obj.close()
+
+    title = extract_title(markdown)
+    block = markdown_to_html(markdown)
+
+    content = block.to_html()
+    template = template.replace("{{ Title }}", title).replace("{{ Content }}", content)
+
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+
+    file_obj = open(dest_path, mode='w')
+    file_obj.write(template)
+    file_obj.close()
